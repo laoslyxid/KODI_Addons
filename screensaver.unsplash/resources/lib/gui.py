@@ -97,14 +97,47 @@ class GUI(xbmcgui.WindowXMLDialog):
          
     def setImage(self, id, images):
         if images:
-            current_image = random.choice(images)  # Pick a random image
-            if current_image and current_image.startswith("http"):
-                self.log(f"Setting image: {current_image}")  # Log the valid URL of the image being set
-                self.getControl(id).setImage(current_image)
+            if not hasattr(self, 'image_cycle'):
+                random.shuffle(images)
+                self.image_cycle = itertools.cycle(images)
+
+            current_image = next(self.image_cycle)
+            if isinstance(current_image, dict):
+                url = current_image['url']
+                author = current_image.get('author', '')
+                location = current_image.get('location', '')
             else:
-                self.log(f"Invalid image URL: {current_image}", xbmc.LOGERROR)
+                url = current_image
+                author, location = '', ''
+
+            if url and url.startswith("http"):
+                self.log(f"Setting image: {url}")
+                self.getControl(id).setImage(url)
+
+                # Nur Overlay setzen, wenn Daten existieren
+                overlay_parts = []
+                if author:
+                    overlay_parts.append(author)
+                if location:
+                    overlay_parts.append(location)
+
+                if overlay_parts:
+                    overlay_text = " – ".join(overlay_parts)
+                    try:
+                        self.getControl(9001).setLabel(overlay_text)
+                    except Exception as e:
+                        self.log(f"Overlay label failed: {str(e)}", xbmc.LOGERROR)
+                else:
+                    # Falls keine Daten: Label leeren
+                    try:
+                        self.getControl(9001).setLabel("")
+                    except Exception:
+                        pass
+            else:
+                self.log(f"Invalid image URL: {url}", xbmc.LOGERROR)
         else:
             self.log("No images available", xbmc.LOGERROR)
+
 
 
     def startRotation(self):
@@ -139,35 +172,52 @@ class GUI(xbmcgui.WindowXMLDialog):
         try:
             # Detect random endpoint
             if "photos/random" in url:
-                # Use count instead of per_page
-                paginated_url = f'{url}&count=20'
+                paginated_url = f'{url}&count=30'
             else:
-                # Normal list endpoints still use page + per_page
-                paginated_url = f'{url}&page={page}&per_page=20'
+                paginated_url = f'{url}&page={page}&per_page=30'
 
             self.log(f"Fetching URL: {paginated_url}")
             request = urllib.request.Request(paginated_url)
             request.add_header('Authorization', f'Client-ID {API_KEY}')
             request.add_header('User-Agent', 'Mozilla/5.0')
-
             response = urllib.request.urlopen(request, timeout=15)
             data = json.load(response)
 
-            # Handle different response shapes
-            if isinstance(data, dict) and 'urls' in data:
-                # Single photo object
-                image_urls = [data['urls']['full']]
-            elif isinstance(data, list):
-                # Array of photo objects (random with count, or list endpoints)
-                image_urls = [item['urls']['full'] for item in data if 'urls' in item]
-            elif 'results' in data:
-                # Search endpoint
-                image_urls = [item['urls']['full'] for item in data['results'] if 'urls' in item]
-            else:
-                image_urls = []
+            image_data = []
 
-            self.log(f"Retrieved {len(image_urls)} images")
-            return image_urls
+            # Single photo object
+            if isinstance(data, dict) and 'urls' in data:
+                image_data.append({
+                    'url': data['urls']['full'],
+                    'author': data.get('user', {}).get('name', ''),
+                    'location': data.get('location', {}).get('title', ''),
+                    'desc': data.get('alt_description', '')
+                })
+
+            # Array of photo objects
+            elif isinstance(data, list):
+                for item in data:
+                    if 'urls' in item:
+                        image_data.append({
+                            'url': item['urls']['full'],
+                            'author': item.get('user', {}).get('name', ''),
+                            'location': item.get('location', {}).get('title', ''),
+                            'desc': item.get('alt_description', '')
+                        })
+
+            # Search endpoint
+            elif 'results' in data:
+                for item in data['results']:
+                    if 'urls' in item:
+                        image_data.append({
+                            'url': item['urls']['full'],
+                            'author': item.get('user', {}).get('name', ''),
+                            'location': item.get('location', {}).get('title', ''),
+                            'desc': item.get('alt_description', '')
+                        })
+
+            self.log(f"Retrieved {len(image_data)} images")
+            return image_data
 
         except Exception as e:
             self.log(f"openURL Failed on page {page}! Error: {str(e)}", xbmc.LOGERROR)
