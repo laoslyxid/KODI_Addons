@@ -96,48 +96,56 @@ class GUI(xbmcgui.WindowXMLDialog):
 
          
     def setImage(self, id, images):
-        if images:
-            if not hasattr(self, 'image_cycle'):
-                random.shuffle(images)
-                self.image_cycle = itertools.cycle(images)
+        if not hasattr(self, 'image_iter') or self.image_iter is None:
+            # Init and shuffle images
+            random.shuffle(images)
+            self.image_iter = iter(images)
 
-            current_image = next(self.image_cycle)
-            if isinstance(current_image, dict):
-                url = current_image['url']
-                author = current_image.get('author', '')
-                location = current_image.get('location', '')
+        try:
+            current_image = next(self.image_iter)
+        except StopIteration:
+            # Cycle endet -> get new images
+            self.images = self.openURL(IMAGE_URL, self.page)
+            if self.images:
+                random.shuffle(self.images)
+                self.image_iter = iter(self.images)
+                current_image = next(self.image_iter)
             else:
-                url = current_image
-                author, location = '', ''
+                self.log("No new images available", xbmc.LOGERROR)
+                return
 
-            if url and url.startswith("http"):
-                self.log(f"Setting image: {url}")
-                self.getControl(id).setImage(url)
-
-                # Nur Overlay setzen, wenn Daten existieren
-                overlay_parts = []
-                if author:
-                    overlay_parts.append(author)
-                if location:
-                    overlay_parts.append(location)
-
-                if overlay_parts:
-                    overlay_text = " – ".join(overlay_parts)
-                    try:
-                        self.getControl(9001).setLabel(overlay_text)
-                    except Exception as e:
-                        self.log(f"Overlay label failed: {str(e)}", xbmc.LOGERROR)
-                else:
-                    # Falls keine Daten: Label leeren
-                    try:
-                        self.getControl(9001).setLabel("")
-                    except Exception:
-                        pass
-            else:
-                self.log(f"Invalid image URL: {url}", xbmc.LOGERROR)
+        # Get meta data from dict
+        if isinstance(current_image, dict):
+            url = current_image['url']
+            author = current_image.get('author', '')
+            location = current_image.get('location', '')
         else:
-            self.log("No images available", xbmc.LOGERROR)
+            url = current_image
+            author, location = '', ''
 
+        if url and url.startswith("http"):
+            self.getControl(id).setImage(url)
+
+            # Set overlay text if exist
+            overlay_parts = []
+            if author:
+                overlay_parts.append(author)
+            if location:
+                overlay_parts.append(location)
+
+            if overlay_parts:
+                overlay_text = " – ".join(overlay_parts)
+                try:
+                    self.getControl(9001).setLabel(overlay_text)
+                except Exception as e:
+                    self.log(f"Overlay label failed: {str(e)}", xbmc.LOGERROR)
+            else:
+                try:
+                    self.getControl(9001).setLabel("")
+                except Exception:
+                    pass
+        else:
+            self.log(f"Invalid image URL: {url}", xbmc.LOGERROR)
 
 
     def startRotation(self):
