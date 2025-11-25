@@ -31,6 +31,7 @@ ADDON_VERSION  = REAL_SETTINGS.getAddonInfo('version')
 ICON           = REAL_SETTINGS.getAddonInfo('icon')
 FANART         = REAL_SETTINGS.getAddonInfo('fanart')
 LANGUAGE       = REAL_SETTINGS.getLocalizedString
+SHOW_NOTIFICATION = REAL_SETTINGS.getSettingBool("Show_Notification")
 KODI_MONITOR   = xbmc.Monitor()
 
 API_KEY        = REAL_SETTINGS.getSetting("APIKey")
@@ -132,15 +133,15 @@ class GUI(xbmcgui.WindowXMLDialog):
 
             # Prepare notification text
             notification_parts = []
-            if author:
-                notification_parts.append(author)
-
             if location:
                 notification_parts.append(location)
             elif desc:
                 notification_parts.append(desc)
 
-            if notification_parts:
+            if author:
+                notification_parts.append(author)
+
+            if notification_parts and SHOW_NOTIFICATION:
                 overlay_text = " – ".join(notification_parts)
                 try:
                     # Show as Kodi notification instead of label
@@ -148,7 +149,7 @@ class GUI(xbmcgui.WindowXMLDialog):
                         ADDON_NAME,        # heading
                         overlay_text,      # message
                         ICON,              # icon
-                        8000,              # time in ms
+                        5000,              # time in ms
                         False              # sound
                     )
                 except Exception as e:
