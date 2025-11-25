@@ -97,24 +97,27 @@ class GUI(xbmcgui.WindowXMLDialog):
          
     def setImage(self, id, images):
         if not hasattr(self, 'image_iter') or self.image_iter is None:
-            # Initialisieren mit frischen Bildern
+            # Init with new images
             random.shuffle(images)
             self.image_iter = iter(images)
 
         try:
             current_image = next(self.image_iter)
         except StopIteration:
-            # Zyklus beendet → neue Bilder holen
+            # Cycle ended -> get new images
             self.images = self.openURL(IMAGE_URL, self.page)
             if self.images:
                 random.shuffle(self.images)
                 self.image_iter = iter(self.images)
                 current_image = next(self.image_iter)
+
+                # Increment page for next cycle (only matters for search/category endpoints)
+                self.page += 1
             else:
                 self.log("No new images available", xbmc.LOGERROR)
                 return
 
-        # Metadaten aus Dict
+        # Metadaten from dict
         if isinstance(current_image, dict):
             url = current_image['url']
             author = current_image.get('author', '')
@@ -127,21 +130,18 @@ class GUI(xbmcgui.WindowXMLDialog):
         if url and url.startswith("http"):
             self.getControl(id).setImage(url)
 
-            # Debug-Log mit allen Metadaten
-            self.log(f"Image meta: author={author}, location={location}, desc={desc}")
-
-            # Overlay-Text zusammensetzen
-            overlay_parts = []
+            # Prepare notification text
+            notification_parts = []
             if author:
-                overlay_parts.append(author)
+                notification_parts.append(author)
 
             if location:
-                overlay_parts.append(location)
+                notification_parts.append(location)
             elif desc:
-                overlay_parts.append(desc)
+                notification_parts.append(desc)
 
-            if overlay_parts:
-                overlay_text = " – ".join(overlay_parts)
+            if notification_parts:
+                overlay_text = " – ".join(notification_parts)
                 try:
                     # Show as Kodi notification instead of label
                     xbmcgui.Dialog().notification(
