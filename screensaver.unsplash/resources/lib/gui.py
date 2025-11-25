@@ -143,16 +143,16 @@ class GUI(xbmcgui.WindowXMLDialog):
             if overlay_parts:
                 overlay_text = " – ".join(overlay_parts)
                 try:
-                    self.getControl(9001).setLabel(overlay_text)
+                    # Show as Kodi notification instead of label
+                    xbmcgui.Dialog().notification(
+                        header=ADDON_NAME,
+                        message=overlay_text,
+                        icon=ICON,
+                        time=5000,   # 5 seconds
+                        sound=False
+                    )
                 except Exception as e:
-                    self.log(f"Overlay label failed: {str(e)}", xbmc.LOGERROR)
-            else:
-                try:
-                    self.getControl(9001).setLabel("")
-                except Exception:
-                    pass
-        else:
-            self.log(f"Invalid image URL: {url}", xbmc.LOGERROR)
+                    self.log(f"Notification failed: {str(e)}", xbmc.LOGERROR)
 
 
     def startRotation(self):
