@@ -148,7 +148,7 @@ class GUI(xbmcgui.WindowXMLDialog):
                         ADDON_NAME,        # heading
                         overlay_text,      # message
                         ICON,              # icon
-                        5000,              # time in ms
+                        8000,              # time in ms
                         False              # sound
                     )
                 except Exception as e:
@@ -187,9 +187,9 @@ class GUI(xbmcgui.WindowXMLDialog):
         try:
             # Detect random endpoint
             if "photos/random" in url:
-                paginated_url = f'{url}&count=5'
+                paginated_url = f'{url}&count=30'
             else:
-                paginated_url = f'{url}&page={page}&per_page=5'
+                paginated_url = f'{url}&page={page}&per_page=30'
 
             self.log(f"Fetching URL: {paginated_url}")
             request = urllib.request.Request(paginated_url)
