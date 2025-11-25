@@ -145,11 +145,11 @@ class GUI(xbmcgui.WindowXMLDialog):
                 try:
                     # Show as Kodi notification instead of label
                     xbmcgui.Dialog().notification(
-                        header=ADDON_NAME,
-                        message=overlay_text,
-                        icon=ICON,
-                        time=5000,   # 5 seconds
-                        sound=False
+                        ADDON_NAME,        # heading
+                        overlay_text,      # message
+                        ICON,              # icon
+                        5000,              # time in ms
+                        False              # sound
                     )
                 except Exception as e:
                     self.log(f"Notification failed: {str(e)}", xbmc.LOGERROR)
