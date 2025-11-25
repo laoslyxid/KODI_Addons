@@ -97,14 +97,14 @@ class GUI(xbmcgui.WindowXMLDialog):
          
     def setImage(self, id, images):
         if not hasattr(self, 'image_iter') or self.image_iter is None:
-            # Init and shuffle images
+            # Initialisieren mit frischen Bildern
             random.shuffle(images)
             self.image_iter = iter(images)
 
         try:
             current_image = next(self.image_iter)
         except StopIteration:
-            # Cycle endet -> get new images
+            # Zyklus beendet → neue Bilder holen
             self.images = self.openURL(IMAGE_URL, self.page)
             if self.images:
                 random.shuffle(self.images)
@@ -114,24 +114,31 @@ class GUI(xbmcgui.WindowXMLDialog):
                 self.log("No new images available", xbmc.LOGERROR)
                 return
 
-        # Get meta data from dict
+        # Metadaten aus Dict
         if isinstance(current_image, dict):
             url = current_image['url']
             author = current_image.get('author', '')
             location = current_image.get('location', '')
+            desc = current_image.get('desc', '')
         else:
             url = current_image
-            author, location = '', ''
+            author, location, desc = '', '', ''
 
         if url and url.startswith("http"):
             self.getControl(id).setImage(url)
 
-            # Set overlay text if exist
+            # Debug-Log mit allen Metadaten
+            self.log(f"Image meta: author={author}, location={location}, desc={desc}")
+
+            # Overlay-Text zusammensetzen
             overlay_parts = []
             if author:
                 overlay_parts.append(author)
+
             if location:
                 overlay_parts.append(location)
+            elif desc:
+                overlay_parts.append(desc)
 
             if overlay_parts:
                 overlay_text = " – ".join(overlay_parts)
@@ -180,9 +187,9 @@ class GUI(xbmcgui.WindowXMLDialog):
         try:
             # Detect random endpoint
             if "photos/random" in url:
-                paginated_url = f'{url}&count=30'
+                paginated_url = f'{url}&count=5'
             else:
-                paginated_url = f'{url}&page={page}&per_page=30'
+                paginated_url = f'{url}&page={page}&per_page=5'
 
             self.log(f"Fetching URL: {paginated_url}")
             request = urllib.request.Request(paginated_url)
