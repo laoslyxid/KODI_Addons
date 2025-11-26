@@ -31,7 +31,8 @@ ADDON_VERSION = REAL_SETTINGS.getAddonInfo('version')
 ICON = REAL_SETTINGS.getAddonInfo('icon')
 FANART = REAL_SETTINGS.getAddonInfo('fanart')
 LANGUAGE = REAL_SETTINGS.getLocalizedString
-SHOW_NOTIFICATION = REAL_SETTINGS.getSettingBool("Show_Notification")
+SHOW_NOTIFICATION = REAL_SETTINGS.getSettingBool("ShowNotification")
+FETCH_SIZE = int(REAL_SETTINGS.getSetting("FetchSize") or 30)
 KODI_MONITOR = xbmc.Monitor()
 
 API_KEY = REAL_SETTINGS.getSetting("APIKey")
@@ -53,10 +54,24 @@ def build_image_url():
     global category_index
     if CATEGORIES:
         current_category = urllib.parse.quote(CATEGORIES[category_index])
-        url = f"https://api.unsplash.com/photos/random?query={current_category}&count=30&client_id={API_KEY}"
+        photo_type = int(REAL_SETTINGS.getSetting("PhotoType"))
+
+        # Random endpoint (index 2 or 3 in TYPE_PARAMS)
+        if photo_type in [2, 3]:
+            url = f"https://api.unsplash.com/photos/random?query={current_category}&count={FETCH_SIZE}&client_id={API_KEY}"
+
+        # Search endpoint (index 7 in TYPE_PARAMS)
+        elif photo_type == 7:
+            url = f"https://api.unsplash.com/search/photos?query={current_category}&page=1&per_page={FETCH_SIZE}&client_id={API_KEY}"
+
+        # Fallback for other endpoints (collections, user, likes, etc.)
+        else:
+            url = IMAGE_URL
     else:
-        url = IMAGE_URL  # fallback to original URL_PARAMS logic
+        url = IMAGE_URL  # no categories set → use original URL_PARAMS logic
+
     return url
+
 
 def next_category():
     global category_index
@@ -195,41 +210,52 @@ class GUI(xbmcgui.WindowXMLDialog):
 
     def openURL(self, url, page=1):
         try:
+            # Detect endpoint type
             if "photos/random" in url:
-                paginated_url = f'{url}'
+                # Always request a batch of 30 random images
+                paginated_url = f"{url}&count={FETCH_SIZE}"
+            elif "search/photos" in url:
+                # Search endpoint uses page/per_page instead of count
+                paginated_url = f"{url}&page={page}&per_page={FETCH_SIZE}"
             else:
-                paginated_url = f'{url}&page={page}&per_page=30'
+                # Other endpoints (collections, user, likes, etc.)
+                paginated_url = f"{url}&page={page}&per_page={FETCH_SIZE}"
+
             self.log(f"Fetching URL: {paginated_url}")
             request = urllib.request.Request(paginated_url)
-            request.add_header('Authorization', f'Client-ID {API_KEY}')
-            request.add_header('User-Agent', 'Mozilla/5.0')
+            request.add_header("Authorization", f"Client-ID {API_KEY}")
+            request.add_header("User-Agent", "Mozilla/5.0")
             response = urllib.request.urlopen(request, timeout=15)
             data = json.load(response)
+
             image_data = []
-            if isinstance(data, dict) and 'urls' in data:
+            # Single photo object
+            if isinstance(data, dict) and "urls" in data:
                 image_data.append({
-                    'url': data['urls']['full'],
-                    'author': data.get('user', {}).get('name', ''),
-                    'location': data.get('location', {}).get('title', ''),
-                    'desc': data.get('alt_description', '')
+                    "url": data["urls"]["full"],
+                    "author": data.get("user", {}).get("name", ""),
+                    "location": data.get("location", {}).get("title", ""),
+                    "desc": data.get("alt_description", "")
                 })
+            # Array of photo objects
             elif isinstance(data, list):
                 for item in data:
-                    if 'urls' in item:
+                    if "urls" in item:
                         image_data.append({
-                            'url': item['urls']['full'],
-                            'author': item.get('user', {}).get('name', ''),
-                            'location': item.get('location', {}).get('title', ''),
-                            'desc': item.get('alt_description', '')
+                            "url": item["urls"]["full"],
+                            "author": item.get("user", {}).get("name", ""),
+                            "location": item.get("location", {}).get("title", ""),
+                            "desc": item.get("alt_description", "")
                         })
-            elif 'results' in data:
-                for item in data['results']:
-                    if 'urls' in item:
+            # Search endpoint returns results array
+            elif "results" in data:
+                for item in data["results"]:
+                    if "urls" in item:
                         image_data.append({
-                            'url': item['urls']['full'],
-                            'author': item.get('user', {}).get('name', ''),
-                            'location': item.get('location', {}).get('title', ''),
-                            'desc': item.get('alt_description', '')
+                            "url": item["urls"]["full"],
+                            "author": item.get("user", {}).get("name", ""),
+                            "location": item.get("location", {}).get("title", ""),
+                            "desc": item.get("alt_description", "")
                         })
 
             self.log(f"Retrieved {len(image_data)} images")

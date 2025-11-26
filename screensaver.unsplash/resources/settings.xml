@@ -6,7 +6,8 @@
     <setting id="Animate" type="bool" label="32003" default="true"/>
     <setting id="Time" type="bool" label="32004" default="true"/>
     <setting id="Overlay" type="bool" label="32011" default="true"/>
-    <setting id="show_notification" type="bool" label="Show image metadata as notification" default="false" />
+    <setting id="ShowNotification" type="bool" label="Show image metadata as notification" default="false" />
+    <setting id="FetchSize" type="number" label="Images per batch" default="30" min="5" max="30" step="5" />
     <setting id="Resolution" type="enum" label="32010" default="1" values="1280x720|1920x1080|3840x2160"/>
     <setting id="PhotoType" type="enum" label="32005" default="2" values="Daily|Weekly|Random|Featured|User|Likes|Collection|Category"/>
     <setting id="Enable_Keys" type="bool" label="32006" default="false" visible="eq(-1,2)|eq(-1,3)"/>
