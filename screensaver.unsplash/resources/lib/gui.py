@@ -32,42 +32,49 @@ ICON = REAL_SETTINGS.getAddonInfo('icon')
 FANART = REAL_SETTINGS.getAddonInfo('fanart')
 LANGUAGE = REAL_SETTINGS.getLocalizedString
 SHOW_NOTIFICATION = REAL_SETTINGS.getSettingBool("ShowNotification")
-FETCH_SIZE = int(REAL_SETTINGS.getSetting("FetchSize") or 30)
 KODI_MONITOR = xbmc.Monitor()
 
 API_KEY = REAL_SETTINGS.getSetting("APIKey")
 USER = REAL_SETTINGS.getSetting("User").replace('@','')
 COLLECTION = REAL_SETTINGS.getSetting("Collection")
-# Read keywords from settings
-ENABLE_KEYS = REAL_SETTINGS.getSetting("Enable_Keys") == 'true'
-KEYWORDS = "" if not ENABLE_KEYS else urllib.parse.quote(REAL_SETTINGS.getSetting("Keywords"))
-KEYWORDS_LIST = [kw.strip() for kw in KEYWORDS.split(",") if kw.strip()]
 
-keywords_index = 0
+# Fetch size (single definition)
+FETCH_SIZE = int(REAL_SETTINGS.getSetting("FetchSize") or 30)
+
+# Read settings once at init
+photo_type = int(REAL_SETTINGS.getSetting("PhotoType"))
+
+# Depending on mode, pick the right text field
+if photo_type in [2, 3]:   # random or featured
+    terms = REAL_SETTINGS.getSetting("Keywords")
+elif photo_type == 7:      # category/search
+    terms = REAL_SETTINGS.getSetting("Category")
+else:
+    terms = ""
+
+TERMS_LIST = [t.strip() for t in terms.split(",") if t.strip()]
+terms_index = 0
 
 def build_image_url():
-    global keywords_index
-    if KEYWORDS_LIST:
-        current_keyword = urllib.parse.quote(KEYWORDS_LIST[keywords_index])
-        photo_type = int(REAL_SETTINGS.getSetting("PhotoType"))
-
-        # Random endpoints
-        if photo_type in [2, 3]:
-            url = f"https://api.unsplash.com/photos/random?query={current_keyword}&client_id={API_KEY}"
-        # Search endpoint
-        elif photo_type == 7:
-            url = f"https://api.unsplash.com/search/photos?query={current_keyword}&page=1&per_page={FETCH_SIZE}&client_id={API_KEY}"
+    global terms_index
+    if TERMS_LIST:
+        current_term = urllib.parse.quote(TERMS_LIST[terms_index])
+        if photo_type == 2:  # random
+            url = f"https://api.unsplash.com/photos/random?query={current_term}&client_id={API_KEY}"
+        elif photo_type == 3:  # featured
+            url = f"https://api.unsplash.com/photos/random?featured&query={current_term}&client_id={API_KEY}"
+        elif photo_type == 7:  # category/search
+            url = f"https://api.unsplash.com/search/photos?query={current_term}&page=1&per_page={FETCH_SIZE}&client_id={API_KEY}"
         else:
             url = IMAGE_URL
     else:
         url = IMAGE_URL
     return url
 
-def next_keyword():
-    global keywords_index
-    if KEYWORDS_LIST:
-        keywords_index = (keywords_index + 1) % len(KEYWORDS_LIST)
-
+def next_term():
+    global terms_index
+    if TERMS_LIST:
+        terms_index = (terms_index + 1) % len(TERMS_LIST)
 
 BASE_URL = 'https://api.unsplash.com'
 RES = ['1280x720','1920x1080','3840x2160'][int(REAL_SETTINGS.getSetting("Resolution"))]
@@ -86,10 +93,10 @@ TYPE_PARAMS = [
 
 URL_PARAMS = ('%s/%s' % (BASE_URL, TYPE_PARAMS)).format(
     res=RES,
-    keyword=KEYWORDS,
+    keyword="",  # legacy placeholder, not used with cycling
     user=USER,
     cid=COLLECTION,
-    cat=CATEGORY_SETTING,
+    cat="",      # legacy placeholder, not used with cycling
     resp=RES_PARAMS
 )
 
