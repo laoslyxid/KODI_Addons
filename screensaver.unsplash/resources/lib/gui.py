@@ -128,9 +128,9 @@ class GUI(xbmcgui.WindowXMLDialog):
         self.winid.setProperty('unsplash_overlay', 'okay' if REAL_SETTINGS.getSetting("Overlay") == 'true' else 'nope')
         # Initialize pagination
         self.page = 1
-        if CATEGORIES:
+        if TERMS_LIST:
             self.images = self.openURL(build_image_url(), 1)
-            next_category()
+            next_term()
         else:
             self.images = self.openURL(IMAGE_URL, self.page)
             self.page += 1
@@ -144,9 +144,9 @@ class GUI(xbmcgui.WindowXMLDialog):
             current_image = next(self.image_iter)
         except StopIteration:
             # Cycle ended -> get new images
-            if CATEGORIES:
+            if TERMS_LIST:
                 self.images = self.openURL(build_image_url(), 1)
-                next_category()
+                next_term()
             else:
                 self.images = self.openURL(IMAGE_URL, self.page)
                 self.page += 1
