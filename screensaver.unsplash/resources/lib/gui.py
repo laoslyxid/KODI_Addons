@@ -36,47 +36,38 @@ FETCH_SIZE = int(REAL_SETTINGS.getSetting("FetchSize") or 30)
 KODI_MONITOR = xbmc.Monitor()
 
 API_KEY = REAL_SETTINGS.getSetting("APIKey")
-ENABLE_KEYS = REAL_SETTINGS.getSetting("Enable_Keys") == 'true'
-KEYWORDS = "" if not ENABLE_KEYS else urllib.parse.quote(REAL_SETTINGS.getSetting("Keywords"))
 USER = REAL_SETTINGS.getSetting("User").replace('@','')
 COLLECTION = REAL_SETTINGS.getSetting("Collection")
-CATEGORY_SETTING = REAL_SETTINGS.getSetting("Category").strip()
+# Read keywords from settings
+ENABLE_KEYS = REAL_SETTINGS.getSetting("Enable_Keys") == 'true'
+KEYWORDS = "" if not ENABLE_KEYS else urllib.parse.quote(REAL_SETTINGS.getSetting("Keywords"))
+KEYWORDS_LIST = [kw.strip() for kw in KEYWORDS.split(",") if kw.strip()]
 
-# --- NEW LOGIC: categories list + cycling ---
-if CATEGORY_SETTING:
-    CATEGORIES = [c.strip() for c in CATEGORY_SETTING.split(",") if c.strip()]
-else:
-    CATEGORIES = [] # fallback: no categories
-
-category_index = 0
+keywords_index = 0
 
 def build_image_url():
-    global category_index
-    if CATEGORIES:
-        current_category = urllib.parse.quote(CATEGORIES[category_index])
+    global keywords_index
+    if KEYWORDS_LIST:
+        current_keyword = urllib.parse.quote(KEYWORDS_LIST[keywords_index])
         photo_type = int(REAL_SETTINGS.getSetting("PhotoType"))
 
-        # Random endpoint (index 2 or 3 in TYPE_PARAMS)
+        # Random endpoints
         if photo_type in [2, 3]:
-            url = f"https://api.unsplash.com/photos/random?query={current_category}&count={FETCH_SIZE}&client_id={API_KEY}"
-
-        # Search endpoint (index 7 in TYPE_PARAMS)
+            url = f"https://api.unsplash.com/photos/random?query={current_keyword}&client_id={API_KEY}"
+        # Search endpoint
         elif photo_type == 7:
-            url = f"https://api.unsplash.com/search/photos?query={current_category}&page=1&per_page={FETCH_SIZE}&client_id={API_KEY}"
-
-        # Fallback for other endpoints (collections, user, likes, etc.)
+            url = f"https://api.unsplash.com/search/photos?query={current_keyword}&page=1&per_page={FETCH_SIZE}&client_id={API_KEY}"
         else:
             url = IMAGE_URL
     else:
-        url = IMAGE_URL  # no categories set → use original URL_PARAMS logic
-
+        url = IMAGE_URL
     return url
 
+def next_keyword():
+    global keywords_index
+    if KEYWORDS_LIST:
+        keywords_index = (keywords_index + 1) % len(KEYWORDS_LIST)
 
-def next_category():
-    global category_index
-    if CATEGORIES:
-        category_index = (category_index + 1) % len(CATEGORIES)
 
 BASE_URL = 'https://api.unsplash.com'
 RES = ['1280x720','1920x1080','3840x2160'][int(REAL_SETTINGS.getSetting("Resolution"))]
@@ -212,7 +203,7 @@ class GUI(xbmcgui.WindowXMLDialog):
         try:
             # Detect endpoint type
             if "photos/random" in url:
-                # Always request a batch of 30 random images
+                # Always request a batch of n random images
                 paginated_url = f"{url}&count={FETCH_SIZE}"
             elif "search/photos" in url:
                 # Search endpoint uses page/per_page instead of count
