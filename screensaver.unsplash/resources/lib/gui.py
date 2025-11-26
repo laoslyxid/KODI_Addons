@@ -18,107 +18,133 @@
 
 import json, os, random, datetime, itertools, requests, logging
 
-from six.moves     import urllib # type: ignore
-from kodi_six      import xbmc, xbmcaddon, xbmcplugin, xbmcgui, xbmcvfs, py2_encode, py2_decode # type: ignore
+from six.moves import urllib # type: ignore
+from kodi_six import xbmc, xbmcaddon, xbmcplugin, xbmcgui, xbmcvfs, py2_encode, py2_decode # type: ignore
 
 # Plugin Info
-ADDON_ID       = 'screensaver.unsplash'
-REAL_SETTINGS  = xbmcaddon.Addon(id=ADDON_ID)
-ADDON_NAME     = REAL_SETTINGS.getAddonInfo('name')
-SETTINGS_LOC   = REAL_SETTINGS.getAddonInfo('profile')
-ADDON_PATH     = REAL_SETTINGS.getAddonInfo('path')
-ADDON_VERSION  = REAL_SETTINGS.getAddonInfo('version')
-ICON           = REAL_SETTINGS.getAddonInfo('icon')
-FANART         = REAL_SETTINGS.getAddonInfo('fanart')
-LANGUAGE       = REAL_SETTINGS.getLocalizedString
+ADDON_ID = 'screensaver.unsplash'
+REAL_SETTINGS = xbmcaddon.Addon(id=ADDON_ID)
+ADDON_NAME = REAL_SETTINGS.getAddonInfo('name')
+SETTINGS_LOC = REAL_SETTINGS.getAddonInfo('profile')
+ADDON_PATH = REAL_SETTINGS.getAddonInfo('path')
+ADDON_VERSION = REAL_SETTINGS.getAddonInfo('version')
+ICON = REAL_SETTINGS.getAddonInfo('icon')
+FANART = REAL_SETTINGS.getAddonInfo('fanart')
+LANGUAGE = REAL_SETTINGS.getLocalizedString
 SHOW_NOTIFICATION = REAL_SETTINGS.getSettingBool("Show_Notification")
-KODI_MONITOR   = xbmc.Monitor()
+KODI_MONITOR = xbmc.Monitor()
 
-API_KEY        = REAL_SETTINGS.getSetting("APIKey")
-ENABLE_KEYS    = REAL_SETTINGS.getSetting("Enable_Keys") == 'true'
-KEYWORDS       = "" if not ENABLE_KEYS else urllib.parse.quote(REAL_SETTINGS.getSetting("Keywords"))
-USER           = REAL_SETTINGS.getSetting("User").replace('@','')
-COLLECTION     = REAL_SETTINGS.getSetting("Collection")
-CATEGORY       = urllib.parse.quote(REAL_SETTINGS.getSetting("Category"))
+API_KEY = REAL_SETTINGS.getSetting("APIKey")
+ENABLE_KEYS = REAL_SETTINGS.getSetting("Enable_Keys") == 'true'
+KEYWORDS = "" if not ENABLE_KEYS else urllib.parse.quote(REAL_SETTINGS.getSetting("Keywords"))
+USER = REAL_SETTINGS.getSetting("User").replace('@','')
+COLLECTION = REAL_SETTINGS.getSetting("Collection")
+CATEGORY_SETTING = REAL_SETTINGS.getSetting("Category").strip()
 
-BASE_URL       = 'https://api.unsplash.com'
-RES            = ['1280x720','1920x1080','3840x2160'][int(REAL_SETTINGS.getSetting("Resolution"))]
-RES_PARAMS     = ['w=1280&h=720','w=1920&h=1080','w=3840&h=2160'][int(REAL_SETTINGS.getSetting("Resolution"))]
+# --- NEW LOGIC: categories list + cycling ---
+if CATEGORY_SETTING:
+    CATEGORIES = [c.strip() for c in CATEGORY_SETTING.split(",") if c.strip()]
+else:
+    CATEGORIES = [] # fallback: no categories
 
-TYPE_PARAMS    = ['photos?{resp}', 
-                'collections/{cid}/photos?{resp}', 
-                'photos/random?{keyword}{resp}', 
-                'photos/random?featured&{keyword}{resp}', 
-                'users/{user}/photos?{resp}', 
-                'users/{user}/likes?{resp}', 
-                'collections/{cid}/photos?{resp}', 
-                'search/photos?query={cat}&{resp}'][int(REAL_SETTINGS.getSetting("PhotoType"))]
+category_index = 0
 
-URL_PARAMS     = ('%s/%s' % (BASE_URL, TYPE_PARAMS)).format(
-                    res=RES,
-                    keyword=KEYWORDS,
-                    user=USER,
-                    cid=COLLECTION,
-                    cat=CATEGORY,
-                    resp=RES_PARAMS
-                )
+def build_image_url():
+    global category_index
+    if CATEGORIES:
+        current_category = urllib.parse.quote(CATEGORIES[category_index])
+        url = f"https://api.unsplash.com/photos/random?query={current_category}&count=30&client_id={API_KEY}"
+    else:
+        url = IMAGE_URL  # fallback to original URL_PARAMS logic
+    return url
 
-IMAGE_URL      = f'{URL_PARAMS}&client_id={API_KEY}'
-TIMER          = [30,60,120,240][int(REAL_SETTINGS.getSetting("RotateTime"))]
-IMG_CONTROLS   = [30000,30001]
-CYC_CONTROL    = itertools.cycle(IMG_CONTROLS).__next__ #py3
+def next_category():
+    global category_index
+    if CATEGORIES:
+        category_index = (category_index + 1) % len(CATEGORIES)
+
+BASE_URL = 'https://api.unsplash.com'
+RES = ['1280x720','1920x1080','3840x2160'][int(REAL_SETTINGS.getSetting("Resolution"))]
+RES_PARAMS = ['w=1280&h=720','w=1920&h=1080','w=3840&h=2160'][int(REAL_SETTINGS.getSetting("Resolution"))]
+
+TYPE_PARAMS = [
+    'photos?{resp}',
+    'collections/{cid}/photos?{resp}',
+    'photos/random?{keyword}{resp}',
+    'photos/random?featured&{keyword}{resp}',
+    'users/{user}/photos?{resp}',
+    'users/{user}/likes?{resp}',
+    'collections/{cid}/photos?{resp}',
+    'search/photos?query={cat}&{resp}'
+]
+
+URL_PARAMS = ('%s/%s' % (BASE_URL, TYPE_PARAMS)).format(
+    res=RES,
+    keyword=KEYWORDS,
+    user=USER,
+    cid=COLLECTION,
+    cat=CATEGORY_SETTING,
+    resp=RES_PARAMS
+)
+
+IMAGE_URL = f"{URL_PARAMS}&client_id={API_KEY}"
+
+TIMER = [30,60,120,240][int(REAL_SETTINGS.getSetting("RotateTime"))]
+IMG_CONTROLS = [30000,30001]
+CYC_CONTROL = itertools.cycle(IMG_CONTROLS).__next__
 
 class GUI(xbmcgui.WindowXMLDialog):
     def __init__( self, *args, **kwargs ):
         self.isExiting = False
-        
-        
+
     def log(self, msg, level=xbmc.LOGDEBUG):
         xbmc.log('%s-%s-%s'%(ADDON_ID,ADDON_VERSION,msg),level)
-            
-                        
+
     def notificationDialog(self, message, header=ADDON_NAME, sound=False, time=4000, icon=ICON):
-        try: xbmcgui.Dialog().notification(header, message, icon, time, sound=False)
+        try:
+            xbmcgui.Dialog().notification(header, message, icon, time, sound=False)
         except Exception as e:
             self.log("notificationDialog Failed! " + str(e), xbmc.LOGERROR)
-            xbmc.executebuiltin("Notification(%s, %s, %d, %s)" % (header, message, time, icon))
+        xbmc.executebuiltin("Notification(%s, %s, %d, %s)" % (header, message, time, icon))
         return True
-         
-         
+
     def onInit(self):
         self.winid = xbmcgui.Window(xbmcgui.getCurrentWindowDialogId())
         self.winid.setProperty('unsplash_animation', 'okay' if REAL_SETTINGS.getSetting("Animate") == 'true' else 'nope')
         self.winid.setProperty('unsplash_time', 'okay' if REAL_SETTINGS.getSetting("Time") == 'true' else 'nope')
         self.winid.setProperty('unsplash_overlay', 'okay' if REAL_SETTINGS.getSetting("Overlay") == 'true' else 'nope')
         # Initialize pagination
-        self.page   = 1
-        self.images = self.openURL(IMAGE_URL, self.page)
+        self.page = 1
+        if CATEGORIES:
+            self.images = self.openURL(build_image_url(), 1)
+            next_category()
+        else:
+            self.images = self.openURL(IMAGE_URL, self.page)
+            self.page += 1
         self.startRotation()
 
-         
     def setImage(self, id, images):
         if not hasattr(self, 'image_iter') or self.image_iter is None:
-            # Init with new images
             random.shuffle(images)
             self.image_iter = iter(images)
-
         try:
             current_image = next(self.image_iter)
         except StopIteration:
             # Cycle ended -> get new images
-            self.images = self.openURL(IMAGE_URL, self.page)
+            if CATEGORIES:
+                self.images = self.openURL(build_image_url(), 1)
+                next_category()
+            else:
+                self.images = self.openURL(IMAGE_URL, self.page)
+                self.page += 1
             if self.images:
                 random.shuffle(self.images)
                 self.image_iter = iter(self.images)
                 current_image = next(self.image_iter)
-
-                # Increment page for next cycle (only matters for search/category endpoints)
-                self.page += 1
             else:
                 self.log("No new images available", xbmc.LOGERROR)
                 return
-
-        # Metadaten from dict
+        # Metadata
         if isinstance(current_image, dict):
             url = current_image['url']
             author = current_image.get('author', '')
@@ -127,81 +153,59 @@ class GUI(xbmcgui.WindowXMLDialog):
         else:
             url = current_image
             author, location, desc = '', '', ''
-
         if url and url.startswith("http"):
             self.getControl(id).setImage(url)
-
-            # Prepare notification text
-            notification_parts = []
-            if location:
-                notification_parts.append(location)
-            elif desc:
-                notification_parts.append(desc)
-
-            if author:
-                notification_parts.append(author)
-
-            if notification_parts and SHOW_NOTIFICATION:
-                overlay_text = " – ".join(notification_parts)
-                try:
-                    # Show as Kodi notification instead of label
-                    xbmcgui.Dialog().notification(
-                        ADDON_NAME,        # heading
-                        overlay_text,      # message
-                        ICON,              # icon
-                        5000,              # time in ms
-                        False              # sound
+        notification_parts = []
+        if location: notification_parts.append(location)
+        elif desc: notification_parts.append(desc)
+        if author: notification_parts.append(author)
+        if notification_parts and SHOW_NOTIFICATION:
+            overlay_text = " – ".join(notification_parts)
+            try:
+                xbmcgui.Dialog().notification(
+                    ADDON_NAME,
+                    overlay_text,
+                    ICON,
+                    5000,
+                    False
                     )
-                except Exception as e:
-                    self.log(f"Notification failed: {str(e)}", xbmc.LOGERROR)
-
+            except Exception as e:
+                self.log(f"Notification failed: {str(e)}", xbmc.LOGERROR)
 
     def startRotation(self):
         self.currentID = IMG_CONTROLS[0]
         self.nextID = IMG_CONTROLS[1]
-
         if not self.images:
             self.log("No images available to display.", xbmc.LOGERROR)
             return
-
         while not KODI_MONITOR.abortRequested():
-            # Set the current image if available
             if self.images:
-                self.setImage(self.currentID, self.images)  # Passing all the images
-
+                self.setImage(self.currentID, self.images)
             self.getControl(self.nextID).setVisible(False)
             self.getControl(self.currentID).setVisible(True)
             self.nextID = self.currentID
             self.currentID = CYC_CONTROL()
-
             if KODI_MONITOR.waitForAbort(TIMER) or self.isExiting:
                 break
-
 
     def onAction(self, action):
         self.log("onAction")
         self.isExiting = True
         self.close()
 
-    
     def openURL(self, url, page=1):
         try:
-            # Detect random endpoint
             if "photos/random" in url:
-                paginated_url = f'{url}&count=30'
+                paginated_url = f'{url}'
             else:
                 paginated_url = f'{url}&page={page}&per_page=30'
-
             self.log(f"Fetching URL: {paginated_url}")
             request = urllib.request.Request(paginated_url)
             request.add_header('Authorization', f'Client-ID {API_KEY}')
             request.add_header('User-Agent', 'Mozilla/5.0')
             response = urllib.request.urlopen(request, timeout=15)
             data = json.load(response)
-
             image_data = []
-
-            # Single photo object
             if isinstance(data, dict) and 'urls' in data:
                 image_data.append({
                     'url': data['urls']['full'],
@@ -209,8 +213,6 @@ class GUI(xbmcgui.WindowXMLDialog):
                     'location': data.get('location', {}).get('title', ''),
                     'desc': data.get('alt_description', '')
                 })
-
-            # Array of photo objects
             elif isinstance(data, list):
                 for item in data:
                     if 'urls' in item:
@@ -220,8 +222,6 @@ class GUI(xbmcgui.WindowXMLDialog):
                             'location': item.get('location', {}).get('title', ''),
                             'desc': item.get('alt_description', '')
                         })
-
-            # Search endpoint
             elif 'results' in data:
                 for item in data['results']:
                     if 'urls' in item:
@@ -238,14 +238,3 @@ class GUI(xbmcgui.WindowXMLDialog):
         except Exception as e:
             self.log(f"openURL Failed on page {page}! Error: {str(e)}", xbmc.LOGERROR)
             return []
-
-
-
-
-
-
-
-
-
-
-
