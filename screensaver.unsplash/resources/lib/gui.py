@@ -55,22 +55,6 @@ else:
 TERMS_LIST = [t.strip() for t in terms.split(",") if t.strip()]
 terms_index = 0
 
-def build_image_url():
-    global terms_index
-    if TERMS_LIST:
-        current_term = urllib.parse.quote(TERMS_LIST[terms_index])
-        if photo_type == 2:  # random
-            url = f"https://api.unsplash.com/photos/random?query={current_term}&client_id={API_KEY}"
-        elif photo_type == 3:  # featured
-            url = f"https://api.unsplash.com/photos/random?featured&query={current_term}&client_id={API_KEY}"
-        elif photo_type == 7:  # category/search
-            url = f"https://api.unsplash.com/search/photos?query={current_term}&page=1&per_page={FETCH_SIZE}&client_id={API_KEY}"
-        else:
-            url = IMAGE_URL
-    else:
-        url = IMAGE_URL
-    return url
-
 def next_term():
     global terms_index
     if TERMS_LIST:
@@ -135,6 +119,18 @@ class GUI(xbmcgui.WindowXMLDialog):
             self.images = self.openURL(IMAGE_URL, self.page)
             self.page += 1
         self.startRotation()
+
+    def build_image_url(self):
+        if TERMS_LIST:
+            current_term = urllib.parse.quote(TERMS_LIST[self.terms_index])
+            if photo_type == 7:  # category/search
+                return (f"https://api.unsplash.com/search/photos?"
+                        f"query={current_term}&page={self.page}&per_page={FETCH_SIZE}&client_id={API_KEY}")
+            elif photo_type == 2:  # random
+                return f"https://api.unsplash.com/photos/random?query={current_term}&client_id={API_KEY}"
+            elif photo_type == 3:  # featured
+                return f"https://api.unsplash.com/photos/random?featured&query={current_term}&client_id={API_KEY}"
+        return IMAGE_URL
 
     def setImage(self, id, images):
         if not hasattr(self, 'image_iter') or self.image_iter is None:
