@@ -55,6 +55,18 @@ else:
 TERMS_LIST = [t.strip() for t in terms.split(",") if t.strip()]
 terms_index = 0
 
+def buildImageUrl(page, terms_index):
+    if TERMS_LIST:
+        current_term = urllib.parse.quote(TERMS_LIST[terms_index])
+        if photo_type == 7:  # category/search
+            return (f"https://api.unsplash.com/search/photos?"
+                    f"query={current_term}&page={page}&per_page={FETCH_SIZE}&client_id={API_KEY}")
+        elif photo_type == 2:  # random
+            return f"https://api.unsplash.com/photos/random?query={current_term}&client_id={API_KEY}"
+        elif photo_type == 3:  # featured
+            return f"https://api.unsplash.com/photos/random?featured&query={current_term}&client_id={API_KEY}"
+    return IMAGE_URL
+
 def next_term():
     global terms_index
     if TERMS_LIST:
@@ -93,19 +105,7 @@ CYC_CONTROL = itertools.cycle(IMG_CONTROLS).__next__
 class GUI(xbmcgui.WindowXMLDialog):
     def __init__( self, *args, **kwargs ):
         self.isExiting = False
-
-    def buildImageUrl(self):
-        if TERMS_LIST:
-            current_term = urllib.parse.quote(TERMS_LIST[self.terms_index])
-            if photo_type == 7:  # category/search
-                return (f"https://api.unsplash.com/search/photos?"
-                        f"query={current_term}&page={self.page}&per_page={FETCH_SIZE}&client_id={API_KEY}")
-            elif photo_type == 2:  # random
-                return f"https://api.unsplash.com/photos/random?query={current_term}&client_id={API_KEY}"
-            elif photo_type == 3:  # featured
-                return f"https://api.unsplash.com/photos/random?featured&query={current_term}&client_id={API_KEY}"
-        return IMAGE_URL
-    
+  
     def log(self, msg, level=xbmc.LOGDEBUG):
         xbmc.log('%s-%s-%s'%(ADDON_ID,ADDON_VERSION,msg),level)
 
@@ -125,7 +125,7 @@ class GUI(xbmcgui.WindowXMLDialog):
         # Initialize pagination
         self.page = 1
         if TERMS_LIST:
-            self.images = self.openURL(build_image_url(), 1)
+            self.images = self.openURL(buildImageUrl(self.page, terms_index), 1)
             next_term()
         else:
             self.images = self.openURL(IMAGE_URL, self.page)
@@ -141,7 +141,7 @@ class GUI(xbmcgui.WindowXMLDialog):
         except StopIteration:
             # Cycle ended -> get new images
             if TERMS_LIST:
-                self.images = self.openURL(build_image_url(), 1)
+                self.images = self.openURL(buildImageUrl(self.page, terms_index), 1)
                 next_term()
             else:
                 self.images = self.openURL(IMAGE_URL, self.page)
