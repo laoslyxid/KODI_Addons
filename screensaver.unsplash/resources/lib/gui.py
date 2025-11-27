@@ -53,18 +53,20 @@ else:
     terms = ""
 
 TERMS_LIST = [t.strip() for t in terms.split(",") if t.strip()]
+# Build initial page index dict
+PAGE_INDEX = {t: 1 for t in TERMS_LIST}
 terms_index = 0
 
-def buildImageUrl(page, terms_index):
-    if TERMS_LIST:
-        current_term = urllib.parse.quote(TERMS_LIST[terms_index])
-        if photo_type == 7:  # category/search
-            return (f"https://api.unsplash.com/search/photos?"
-                    f"query={current_term}&page={page}&per_page={FETCH_SIZE}&client_id={API_KEY}")
-        elif photo_type == 2:  # random
-            return f"https://api.unsplash.com/photos/random?query={current_term}&client_id={API_KEY}"
-        elif photo_type == 3:  # featured
-            return f"https://api.unsplash.com/photos/random?featured&query={current_term}&client_id={API_KEY}"
+def buildImageUrl(term):
+    page = PAGE_INDEX[term]
+    current_term = urllib.parse.quote(term)
+    if photo_type == 7:  # category/search
+        return (f"https://api.unsplash.com/search/photos?"
+                f"query={current_term}&page={page}&per_page={FETCH_SIZE}&client_id={API_KEY}")
+    elif photo_type == 2:  # random
+        return f"https://api.unsplash.com/photos/random?query={current_term}&client_id={API_KEY}"
+    elif photo_type == 3:  # featured
+        return f"https://api.unsplash.com/photos/random?featured&query={current_term}&client_id={API_KEY}"
     return IMAGE_URL
 
 def next_term():
@@ -123,12 +125,13 @@ class GUI(xbmcgui.WindowXMLDialog):
         self.winid.setProperty('unsplash_time', 'okay' if REAL_SETTINGS.getSetting("Time") == 'true' else 'nope')
         self.winid.setProperty('unsplash_overlay', 'okay' if REAL_SETTINGS.getSetting("Overlay") == 'true' else 'nope')
         # Initialize pagination
-        self.page = 1
         if TERMS_LIST:
-            self.images = self.openURL(buildImageUrl(self.page, terms_index), self.page)
+            current_term = TERMS_LIST[terms_index]
+            self.images = self.openURL(buildImageUrl(current_term), PAGE_INDEX[current_term])
             next_term()
-            self.page += 1
+            PAGE_INDEX[current_term] += 1
         else:
+            self.page = 1
             self.images = self.openURL(IMAGE_URL, self.page)
             self.page += 1
         self.startRotation()
@@ -140,11 +143,16 @@ class GUI(xbmcgui.WindowXMLDialog):
         try:
             current_image = next(self.image_iter)
         except StopIteration:
-            # Cycle ended -> get new images
             if TERMS_LIST:
-                self.images = self.openURL(buildImageUrl(self.page, terms_index), self.page)
+                current_term = TERMS_LIST[terms_index]
+                self.images = self.openURL(buildImageUrl(current_term), PAGE_INDEX[current_term])
+                if not self.images:
+                    # Reset page index if no results
+                    PAGE_INDEX[current_term] = 1
+                    self.log(f"No results for {current_term}, resetting to page 1", xbmc.LOGDEBUG)
+                    self.images = self.openURL(buildImageUrl(current_term), PAGE_INDEX[current_term])
                 next_term()
-                self.page += 1
+                PAGE_INDEX[current_term] += 1
             else:
                 self.images = self.openURL(IMAGE_URL, self.page)
                 self.page += 1
