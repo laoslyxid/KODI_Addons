@@ -125,8 +125,9 @@ class GUI(xbmcgui.WindowXMLDialog):
         # Initialize pagination
         self.page = 1
         if TERMS_LIST:
-            self.images = self.openURL(buildImageUrl(self.page, terms_index), 1)
+            self.images = self.openURL(buildImageUrl(self.page, terms_index), self.page)
             next_term()
+            self.page += 1
         else:
             self.images = self.openURL(IMAGE_URL, self.page)
             self.page += 1
@@ -141,8 +142,9 @@ class GUI(xbmcgui.WindowXMLDialog):
         except StopIteration:
             # Cycle ended -> get new images
             if TERMS_LIST:
-                self.images = self.openURL(buildImageUrl(self.page, terms_index), 1)
+                self.images = self.openURL(buildImageUrl(self.page, terms_index), self.page)
                 next_term()
+                self.page += 1
             else:
                 self.images = self.openURL(IMAGE_URL, self.page)
                 self.page += 1
